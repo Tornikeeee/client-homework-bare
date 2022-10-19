@@ -15,6 +15,7 @@
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <maven.compiler.release>11</maven.compiler.release>
+    <log4j2.version>2.18.0</log4j2.version>
   </properties>
 
   <dependencies>
@@ -28,6 +29,16 @@
       <groupId>com.sun.xml.ws</groupId>
       <artifactId>jaxws-rt</artifactId>
       <version>4.0.0</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.logging.log4j</groupId>
+      <artifactId>log4j-api</artifactId>
+      <version>${log4j2.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.logging.log4j</groupId>
+      <artifactId>log4j-core</artifactId>
+      <version>${log4j2.version}</version>
     </dependency>
   </dependencies>
 
@@ -72,6 +83,10 @@
               <archive>
                 <manifest>
                   <mainClass>com.tadamia.App</mainClass>
+                  <manifestEntries>
+                    <Class-Path>./conf/log4j2</Class-Path>
+                    <Multi-Release>true</Multi-Release>
+                  </manifestEntries>
                 </manifest>
               </archive>
             </configuration>

@@ -1,10 +1,20 @@
 package com.tadamia;
 
+import com.sun.xml.ws.client.BindingProviderProperties;
 import com.tadamia.client.ws.bare.*;
+import jakarta.xml.ws.Binding;
+import jakarta.xml.ws.BindingProvider;
 
+import javax.net.ssl.*;
+import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.security.KeyManagementException;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 
 /**
  * Hello world!
@@ -13,19 +23,53 @@ import java.util.List;
 public class App 
 {
     private static PersonsWSBare personsWSBare;
-    static AuthRequest authRequest = new AuthRequest();
+    private static AuthRequest authRequest = new AuthRequest();
+    private static Properties props;
 
     static {
-        authRequest.setUsername("adminUser");
-        authRequest.setPassword("asdASD123");
 
         try {
-            URL urlBare = new URL("http://localhost:8080/person-service/PersonServiceBare?wsdl");
+            props = Config.loadFile();
 
-            PersonsWSBareImplService personsWSBareImplService = new PersonsWSBareImplService(urlBare);
+            /*
+            url = http://localhost:8080/person-service/PersonService
+timeout = 10000
+username = adminUser
+password = asdASD123
+            * */
 
+            authRequest.setUsername(props.getProperty("username"));
+            authRequest.setPassword(props.getProperty("password"));
+
+//            URL urlBare = new URL("http://localhost:8080/person-service/PersonServiceBare?wsdl");
+
+            PersonsWSBareImplService personsWSBareImplService = new PersonsWSBareImplService();
             personsWSBare = personsWSBareImplService.getPersonsWSBareImplPort();
+            BindingProvider bindingProvider = (BindingProvider) personsWSBare;
+
+            //8443 პორტზე შემექმნა პრობლემა, ვერ გავხსენი ეგ პორტი
+            bindingProvider.getRequestContext().put(BindingProvider.ENDPOINT_ADDRESS_PROPERTY, props.getProperty("url"));//"http://localhost:8080/person-service/PersonService");
+
+            bindingProvider.getRequestContext().put(BindingProviderProperties.REQUEST_TIMEOUT, Integer.parseInt(props.getProperty("timeout",null)));//10_000);
+            bindingProvider.getRequestContext().put(BindingProviderProperties.CONNECT_TIMEOUT, Integer.parseInt(props.getProperty("timeout",null)));//10_000);
+
+
+            SSLContext sslContext = getInsecureSSLContext();
+            bindingProvider.getRequestContext().put(BindingProviderProperties.SSL_SOCKET_FACTORY, sslContext.getSocketFactory());
+            HostnameVerifier hostnameVerifier = getHostnameVerifier();
+            bindingProvider.getRequestContext().put(BindingProviderProperties.HOSTNAME_VERIFIER, hostnameVerifier);
+
+
+            Binding binding = bindingProvider.getBinding();
+            var handlerList = binding.getHandlerChain();
+            if (handlerList == null) {
+                handlerList = new ArrayList<>();
+            }
+            handlerList.add(new SoapHandler());
+            binding.setHandlerChain(handlerList);
         } catch (MalformedURLException e) {
+            throw new RuntimeException(e);
+        } catch (IOException e) {
             throw new RuntimeException(e);
         }
 
@@ -120,5 +164,36 @@ public class App
 
     public static String personToString(Person person) {
         return "Person: [id:" + person.getId() + " lastname:" + person.getLastname() + " firstname:" + person.getFirstname() + " age:" + person.getAge() + "]";
+    }
+
+    private static SSLContext getInsecureSSLContext() {
+        TrustManager[] trustStore = new TrustManager[] { new X509TrustManager() {
+            public java.security.cert.X509Certificate[] getAcceptedIssuers() {
+                return null;
+            }
+
+            public void checkClientTrusted(java.security.cert.X509Certificate[] certs, String authType) {
+            }
+
+            public void checkServerTrusted(java.security.cert.X509Certificate[] certs, String authType) {
+            }
+        } };
+
+        try {
+            SSLContext sc = SSLContext.getInstance("SSL");
+            sc.init(null, trustStore, new SecureRandom());
+            return sc;
+        } catch (KeyManagementException | NoSuchAlgorithmException ex) {
+            return null;
+        }
+    }
+
+    private static HostnameVerifier getHostnameVerifier() {
+        return new HostnameVerifier() {
+            @Override
+            public boolean verify(String hostname, SSLSession sslSession) {
+                return true;
+            }
+        };
     }
 }
